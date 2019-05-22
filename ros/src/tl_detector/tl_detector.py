@@ -5,6 +5,7 @@ from geometry_msgs.msg import PoseStamped, Pose
 from styx_msgs.msg import TrafficLightArray, TrafficLight
 from styx_msgs.msg import Lane
 from sensor_msgs.msg import Image
+from scipy.spatial import KDTree
 from cv_bridge import CvBridge
 from light_classification.tl_classifier import TLClassifier
 import tf
@@ -18,9 +19,12 @@ class TLDetector(object):
         rospy.init_node('tl_detector')
 
         self.pose = None
-        self.waypoints = None
         self.camera_image = None
         self.lights = []
+        self.waypoint_tree = None
+        self.base_waypoints = None
+        self.waypoints_2d = None
+        self.waypoint_tree = None
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -48,14 +52,18 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
-
+        
         rospy.spin()
 
     def pose_cb(self, msg):
         self.pose = msg
 
     def waypoints_cb(self, waypoints):
-        self.waypoints = waypoints
+        self.base_waypoints = waypoints
+        if not self.waypoints_2d:
+            self.waypoints_2d = [[waypoint.pose.pose.position.x, waypoint.pose.pose.position.y] for waypoint in
+                                 waypoints.waypoints]
+            self.waypoint_tree = KDTree(self.waypoints_2d)
 
     def traffic_cb(self, msg):
         self.lights = msg.lights
@@ -159,7 +167,7 @@ class TLDetector(object):
             return line_wp_idx, state
         
         return -1, TrafficLight.UNKNOWN
-
+    
 if __name__ == '__main__':
     try:
         TLDetector()

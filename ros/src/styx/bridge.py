@@ -44,6 +44,7 @@ class Bridge(object):
         self.yaw = None
         self.angular_vel = 0.
         self.bridge = CvBridge()
+        self.num_images = 0
 
         self.callbacks = {
             '/vehicle/steering_cmd': self.callback_steering,
@@ -175,12 +176,14 @@ class Bridge(object):
         self.publishers['dbw_status'].publish(Bool(data))
 
     def publish_camera(self, data):
-        imgString = data["image"]
-        image = PIL_Image.open(BytesIO(base64.b64decode(imgString)))
-        image_array = np.asarray(image)
-
-        image_message = self.bridge.cv2_to_imgmsg(image_array, encoding="rgb8")
-        self.publishers['image'].publish(image_message)
+        # reduce number of images sent from simulator to conserve compute -- note: does not seem to help
+        self.num_images += 1
+        if (self.num_images % 2) == 0:
+            imgString = data["image"]
+            image = PIL_Image.open(BytesIO(base64.b64decode(imgString)))
+            image_array = np.asarray(image)
+            image_message = self.bridge.cv2_to_imgmsg(image_array, encoding="rgb8")
+            self.publishers['image'].publish(image_message)
 
     def callback_steering(self, data):
         self.server('steer', data={'steering_angle': str(data.steering_wheel_angle_cmd)})
